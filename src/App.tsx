@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
-const api = (window as any).crmApi;
-
-type Customer = {
+interface Customer {
   id: string;
   first_name: string;
   last_name: string;
@@ -15,9 +13,9 @@ type Customer = {
   company_name: string;
   notes: string;
   status: string;
-};
+}
 
-type Product = {
+interface Product {
   id: string;
   name: string;
   category: string;
@@ -25,9 +23,23 @@ type Product = {
   price: number;
   stock: number;
   company_name: string;
-};
+}
 
-const defaultCustomer = {
+declare global {
+  interface Window {
+    crmApi: {
+      getCustomers: () => Promise<Customer[]>;
+      saveCustomer: (customer: Customer) => Promise<Customer>;
+      getProducts: () => Promise<Product[]>;
+      addProduct: (product: Product) => Promise<Product[]>;
+      getDailyUsage: () => Promise<{ count: number; day: string }>;
+      openWhatsapp: () => Promise<void>;
+      getWhatsappStatus: () => Promise<{ status: string; connected: boolean }>;
+    };
+  }
+}
+
+const defaultCustomer: Customer = {
   id: uuidv4(),
   first_name: '',
   last_name: '',
@@ -41,71 +53,67 @@ const defaultCustomer = {
   status: 'active'
 };
 
+const defaultProduct: Product = {
+  id: uuidv4(),
+  name: '',
+  category: 'service',
+  description: '',
+  price: 0,
+  stock: 0,
+  company_name: ''
+};
+
 export default function App() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [whatsappStatus, setWhatsappStatus] = useState('disconnected');
   const [dailyUsage, setDailyUsage] = useState({ count: 0, day: '' });
-  const [customerForm, setCustomerForm] = useState(defaultCustomer);
-  const [productForm, setProductForm] = useState({
-    id: uuidv4(),
-    name: '',
-    category: 'service',
-    description: '',
-    price: 0,
-    stock: 0,
-    company_name: ''
-  });
+  const [customerForm, setCustomerForm] = useState<Customer>(defaultCustomer);
+  const [productForm, setProductForm] = useState<Product>(defaultProduct);
 
-  async function refreshAll() {
-    const list = await api.getCustomers();
+  async function refreshData() {
+    const list = await window.crmApi.getCustomers();
     setCustomers(list);
-    if (list.length && !selectedCustomerId) {
+
+    if (!selectedCustomerId && list.length > 0) {
       setSelectedCustomerId(list[0].id);
     }
 
-    const items = await api.getProducts();
-    setProducts(items);
+    const productList = await window.crmApi.getProducts();
+    setProducts(productList);
 
-    const usage = await api.getDailyUsage();
+    const usage = await window.crmApi.getDailyUsage();
     setDailyUsage(usage);
 
-    const whatsapp = await api.getWhatsappStatus();
-    setWhatsappStatus(whatsapp.status || 'disconnected');
+    const status = await window.crmApi.getWhatsappStatus();
+    setWhatsappStatus(status.status || 'disconnected');
   }
 
   useEffect(() => {
-    refreshAll();
+    refreshData();
   }, []);
 
-  const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) || customers[0];
+  const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) ?? customers[0];
 
   async function handleSaveCustomer() {
     const payload = { ...customerForm, id: customerForm.id || uuidv4() };
-    await api.saveCustomer(payload);
+    await window.crmApi.saveCustomer(payload);
     setCustomerForm({ ...defaultCustomer, id: uuidv4() });
-    await refreshAll();
+    await refreshData();
   }
 
   async function handleAddProduct() {
-    await api.addProduct({ ...productForm, id: productForm.id || uuidv4() });
-    setProductForm({
-      id: uuidv4(),
-      name: '',
-      category: 'service',
-      description: '',
-      price: 0,
-      stock: 0,
-      company_name: ''
-    });
-    await refreshAll();
+    const payload = { ...productForm, id: productForm.id || uuidv4() };
+    await window.crmApi.addProduct(payload);
+    setProductForm({ ...defaultProduct, id: uuidv4() });
+    await refreshData();
   }
 
   async function handleOpenWhatsapp() {
-    await api.openWhatsapp();
-    const status = await api.getWhatsappStatus();
-    setWhatsappStatus(status.status || 'disconnected');
+    await window.crmApi.openWhatsapp();
+    const result = await window.crmApi.getWhatsappStatus();
+    setWhatsappStatus(result.status || 'disconnected');
   }
 
   return (
@@ -163,6 +171,7 @@ export default function App() {
               <strong>Messages</strong>
               <button className="secondary-button">Send invoice</button>
             </div>
+
             <div className="chat-box">
               <div className="message incoming">
                 <span>Hi, thanks for your order. We can help with more details.</span>
@@ -171,6 +180,7 @@ export default function App() {
                 <span>Perfect, I want to see the price for the package.</span>
               </div>
             </div>
+
             <div className="composer">
               <input type="text" placeholder="Type your message..." />
               <button className="primary-button">Send</button>

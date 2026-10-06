@@ -1,81 +1,81 @@
-import Database from 'better-sqlite3';
-import path from 'node:path';
+import fs from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
+import Database from 'better-sqlite3';
 
-const dbDir = path.join(os.homedir(), 'whatsapp-crm-business-data');
-const dbPath = path.join(dbDir, 'crm.db');
+const dataDir = path.join(os.homedir(), 'whatsapp-crm-business-data');
+fs.mkdirSync(dataDir, { recursive: true });
 
+const dbPath = path.join(dataDir, 'crm.db');
 const db = new Database(dbPath);
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS customers (
-    id TEXT PRIMARY KEY,
-    first_name TEXT,
-    last_name TEXT,
-    address TEXT,
-    phone TEXT,
-    whatsapp TEXT,
-    email TEXT,
-    cpf TEXT,
-    company_name TEXT,
-    notes TEXT,
-    status TEXT,
-    created_at TEXT,
-    updated_at TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS notes (
-    id TEXT PRIMARY KEY,
-    customer_id TEXT,
-    content TEXT,
-    created_at TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS products (
-    id TEXT PRIMARY KEY,
-    name TEXT,
-    category TEXT,
-    description TEXT,
-    price REAL,
-    stock INTEGER,
-    company_name TEXT,
-    created_at TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS sales (
-    id TEXT PRIMARY KEY,
-    customer_id TEXT,
-    product_id TEXT,
-    quantity INTEGER,
-    unit_price REAL,
-    total REAL,
-    notes TEXT,
-    created_at TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS invoices (
-    id TEXT PRIMARY KEY,
-    customer_id TEXT,
-    sale_id TEXT,
-    template_id TEXT,
-    invoice_number TEXT,
-    total REAL,
-    created_at TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS daily_usage (
-    day_key TEXT PRIMARY KEY,
-    count INTEGER DEFAULT 0
-  );
-`);
-
 export function initializeDb() {
-  return db;
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS customers (
+      id TEXT PRIMARY KEY,
+      first_name TEXT,
+      last_name TEXT,
+      address TEXT,
+      phone TEXT,
+      whatsapp TEXT,
+      email TEXT,
+      cpf TEXT,
+      company_name TEXT,
+      notes TEXT,
+      status TEXT,
+      created_at TEXT,
+      updated_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS notes (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT,
+      content TEXT,
+      created_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      category TEXT,
+      description TEXT,
+      price REAL,
+      stock INTEGER,
+      company_name TEXT,
+      created_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS sales (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT,
+      product_id TEXT,
+      quantity INTEGER,
+      unit_price REAL,
+      total REAL,
+      notes TEXT,
+      created_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS invoices (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT,
+      sale_id TEXT,
+      template_id TEXT,
+      invoice_number TEXT,
+      total REAL,
+      created_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS daily_usage (
+      day_key TEXT PRIMARY KEY,
+      count INTEGER DEFAULT 0
+    );
+  `);
 }
 
 export function getCustomers() {
@@ -83,8 +83,10 @@ export function getCustomers() {
 }
 
 export function saveCustomer(customer: any) {
-  const exists = db.prepare('SELECT 1 FROM customers WHERE id = ?').get(customer.id);
-  if (exists) {
+  const existing = db.prepare('SELECT 1 FROM customers WHERE id = ?').get(customer.id);
+  const now = new Date().toISOString();
+
+  if (existing) {
     db.prepare(`
       UPDATE customers
       SET first_name = ?, last_name = ?, address = ?, phone = ?, whatsapp = ?, email = ?, cpf = ?, company_name = ?, notes = ?, status = ?, updated_at = ?
@@ -100,7 +102,7 @@ export function saveCustomer(customer: any) {
       customer.company_name ?? '',
       customer.notes ?? '',
       customer.status ?? 'active',
-      new Date().toISOString(),
+      now,
       customer.id
     );
     return db.prepare('SELECT * FROM customers WHERE id = ?').get(customer.id);
@@ -121,8 +123,8 @@ export function saveCustomer(customer: any) {
     customer.company_name ?? '',
     customer.notes ?? '',
     customer.status ?? 'active',
-    new Date().toISOString(),
-    new Date().toISOString()
+    now,
+    now
   );
 
   return db.prepare('SELECT * FROM customers WHERE id = ?').get(customer.id);
@@ -139,7 +141,7 @@ export function addProduct(product: any) {
   `).run(
     product.id,
     product.name ?? '',
-    product.category ?? 'general',
+    product.category ?? 'service',
     product.description ?? '',
     product.price ?? 0,
     product.stock ?? 0,
@@ -194,7 +196,7 @@ export function addInvoice(invoice: any) {
     invoice.id,
     invoice.customer_id,
     invoice.sale_id ?? '',
-    invoice.template_id ?? 'basic',
+    invoice.template_id ?? 'minimal',
     invoice.invoice_number ?? 'INV-0001',
     invoice.total ?? 0,
     new Date().toISOString()
@@ -203,9 +205,8 @@ export function addInvoice(invoice: any) {
 }
 
 export function getSettings() {
-  return Object.fromEntries(
-    db.prepare('SELECT key, value FROM settings').all().map((row: any) => [row.key, row.value])
-  );
+  const rows = db.prepare('SELECT key, value FROM settings').all() as Array<{ key: string; value: string }>;
+  return Object.fromEntries(rows.map((row) => [row.key, row.value]));
 }
 
 export function updateSettings(settings: Record<string, string>) {
@@ -217,19 +218,15 @@ export function updateSettings(settings: Record<string, string>) {
 }
 
 export function getDailyUsage() {
-  const today = new Date().toISOString().slice(0, 10);
-  const row = db.prepare('SELECT count FROM daily_usage WHERE day_key = ?').get(today);
-  return { day: today, count: row?.count ?? 0 };
+  const day = new Date().toISOString().slice(0, 10);
+  const row = db.prepare('SELECT count FROM daily_usage WHERE day_key = ?').get(day) as { count: number } | undefined;
+  return { day, count: row?.count ?? 0 };
 }
 
 export function incrementDailyUsage() {
-  const today = new Date().toISOString().slice(0, 10);
-  const row = db.prepare('SELECT count FROM daily_usage WHERE day_key = ?').get(today);
-  const nextCount = (row?.count ?? 0) + 1;
-  db.prepare(`
-    INSERT INTO daily_usage (day_key, count) VALUES (?, ?) ON CONFLICT(day_key) DO UPDATE SET count = excluded.count
-  `).run(today, nextCount);
-  return nextCount;
+  const day = new Date().toISOString().slice(0, 10);
+  const row = db.prepare('SELECT count FROM daily_usage WHERE day_key = ?').get(day) as { count: number } | undefined;
+  const next = (row?.count ?? 0) + 1;
+  db.prepare('INSERT INTO daily_usage (day_key, count) VALUES (?, ?) ON CONFLICT(day_key) DO UPDATE SET count = excluded.count').run(day, next);
+  return next;
 }
-
-export { db };

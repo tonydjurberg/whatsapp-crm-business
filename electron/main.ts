@@ -1,25 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import {
-  initializeDb,
-  getCustomers,
-  saveCustomer,
-  getProducts,
-  addProduct,
-  getNotes,
-  saveNote,
-  getSales,
-  addSale,
-  getInvoices,
-  addInvoice,
-  getSettings,
-  updateSettings,
-  getDailyUsage
-} from './db';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { initializeDb, getCustomers, saveCustomer, getProducts, addProduct, getNotes, saveNote, getSales, addSale, getInvoices, addInvoice, getSettings, updateSettings, getDailyUsage } from './db';
 
 let mainWindow: BrowserWindow | null = null;
 let whatsappWindow: BrowserWindow | null = null;
@@ -30,7 +11,7 @@ function createMainWindow() {
     height: 980,
     minWidth: 1100,
     minHeight: 760,
-    backgroundColor: '#121b22',
+    backgroundColor: '#101b20',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -38,8 +19,7 @@ function createMainWindow() {
     }
   });
 
-  const isDev = !app.isPackaged;
-  if (isDev) {
+  if (!app.isPackaged) {
     mainWindow.loadURL('http://localhost:5173');
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
@@ -75,7 +55,7 @@ async function openWhatsappWindow() {
   });
 }
 
-async function getWhatsAppStatus() {
+async function getWhatsappStatus() {
   if (!whatsappWindow) {
     return { status: 'disconnected', connected: false };
   }
@@ -84,18 +64,11 @@ async function getWhatsAppStatus() {
     const result = await whatsappWindow.webContents.executeJavaScript(`
       (() => {
         const url = location.href;
-        const isLoggedIn = !!document.querySelector('canvas[aria-label="WhatsApp"]') || url.includes('/chat');
-        const qrVisible = !!document.querySelector('canvas[aria-label="Scan me!"]') || url.includes('/qr');
-        const hasChat = url.includes('/chat');
+        const loggedIn = url.includes('/chat') || !!document.querySelector('[data-testid="conversation-panel"]');
+        const qrVisible = !!document.querySelector('canvas[aria-label="Scan me!"]') || url.includes('/app') || url.includes('/qr');
 
-        if (hasChat || isLoggedIn) {
-          return { status: 'connected', connected: true };
-        }
-
-        if (qrVisible || url.includes('/app')) {
-          return { status: 'qr-required', connected: false };
-        }
-
+        if (loggedIn) return { status: 'connected', connected: true };
+        if (qrVisible) return { status: 'qr-required', connected: false };
         return { status: 'disconnected', connected: false };
       })()
     `);
@@ -110,20 +83,20 @@ app.whenReady().then(() => {
   createMainWindow();
 
   ipcMain.handle('crm:get-customers', () => getCustomers());
-  ipcMain.handle('crm:save-customer', (_, customer) => saveCustomer(customer));
+  ipcMain.handle('crm:save-customer', (_event, customer) => saveCustomer(customer));
   ipcMain.handle('crm:get-products', () => getProducts());
-  ipcMain.handle('crm:add-product', (_, product) => addProduct(product));
-  ipcMain.handle('crm:get-notes', (_, customerId) => getNotes(customerId));
-  ipcMain.handle('crm:save-note', (_, note) => saveNote(note));
-  ipcMain.handle('crm:get-sales', (_, customerId) => getSales(customerId));
-  ipcMain.handle('crm:add-sale', (_, sale) => addSale(sale));
-  ipcMain.handle('crm:get-invoices', (_, customerId) => getInvoices(customerId));
-  ipcMain.handle('crm:add-invoice', (_, invoice) => addInvoice(invoice));
+  ipcMain.handle('crm:add-product', (_event, product) => addProduct(product));
+  ipcMain.handle('crm:get-notes', (_event, customerId) => getNotes(customerId));
+  ipcMain.handle('crm:save-note', (_event, note) => saveNote(note));
+  ipcMain.handle('crm:get-sales', (_event, customerId) => getSales(customerId));
+  ipcMain.handle('crm:add-sale', (_event, sale) => addSale(sale));
+  ipcMain.handle('crm:get-invoices', (_event, customerId) => getInvoices(customerId));
+  ipcMain.handle('crm:add-invoice', (_event, invoice) => addInvoice(invoice));
   ipcMain.handle('crm:get-settings', () => getSettings());
-  ipcMain.handle('crm:update-settings', (_, settings) => updateSettings(settings));
+  ipcMain.handle('crm:update-settings', (_event, settings) => updateSettings(settings));
   ipcMain.handle('crm:get-daily-usage', () => getDailyUsage());
   ipcMain.handle('crm:open-whatsapp', () => openWhatsappWindow());
-  ipcMain.handle('crm:get-whatsapp-status', () => getWhatsAppStatus());
+  ipcMain.handle('crm:get-whatsapp-status', () => getWhatsappStatus());
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

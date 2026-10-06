@@ -1,20 +1,16 @@
 # WhatsApp CRM Business
 
-A local desktop CRM for customer management, sales, notes, and WhatsApp communication.
+A local desktop CRM for business communications, customer records, products, invoices, and WhatsApp automation.
 
-## What is included
+## What this project includes
 
 - Electron desktop shell
-- React + TypeScript renderer
-- SQLite local database
-- Customers, notes, products, sales, invoices
-- Embedded WhatsApp Web flow inside the app
+- React UI layout for CRM workflow
+- SQLite persistence for customers, notes, products, sales, and invoices
+- Embedded WhatsApp Web opener inside the app
 - Product and customer management UI
-- Local file storage for business records
-
-## Important note
-
-This is a local business CRM skeleton that embeds WhatsApp Web inside the app, which is the legitimate desktop approach without using the official WhatsApp API. Full reliability depends on the WhatsApp Web session and browser environment, but the project is structured as a real app and is ready to extend.
+- Local message/day limit logic foundation
+- Windows packaging setup for .exe distribution
 
 ## Development
 
@@ -23,25 +19,16 @@ npm install
 npm run dev
 ```
 
-## Production build
+## Build for production
 
 ```bash
 npm run build
 npm run dist
 ```
 
-## Windows app packaging
+## Notes
 
-- Build the app with `npm run build`
-- Package with `npm run dist`
-- Use the generated installer in the `release/` folder
-
-## Basic architecture
-
-- `electron/` — Electron app controller, IPC, database logic
-- `src/` — React UI
-- `dist/` — built frontend output
-- `release/` — packaged Windows app output
+This is a legitimate local business CRM foundation that follows the safest architecture for desktop app + WhatsApp Web use without direct WhatsApp API usage. The WhatsApp session runs inside the desktop app, while the CRM logic and data remain local.
 
 ## License
 
